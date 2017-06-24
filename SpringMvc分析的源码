@@ -1,0 +1,302 @@
+MainController.java
+
+package com.cenyol.example.controller;
+
+import com.cenyol.example.model.UserEntity;
+import com.cenyol.example.repository.UserRepository;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Controller;
+import org.springframework.ui.ModelMap;
+import org.springframework.web.bind.annotation.ModelAttribute;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestMethod;
+
+import java.lang.reflect.Method;
+import java.util.List;
+
+/**
+ * Created by sjj on 2015/10/24 0024.
+ */
+@Controller
+public class MainController {
+
+    // 自动装配
+    @Autowired
+    private UserRepository userRepository;
+
+    // 首页
+    @RequestMapping(value = "/", method = RequestMethod.GET)
+    public String index() {
+        return "index";
+    }
+
+    // 用户管理
+    @RequestMapping(value = "/users", method = RequestMethod.GET)
+    public String users(ModelMap modelMap){
+        // 找到user表里面的所有记录
+        List<UserEntity> userEntityList = userRepository.findAll();
+
+        // 将所有的记录传递给返回的jsp页面
+        modelMap.addAttribute("userList", userEntityList);
+
+        // 返回pages目录下的userManage.jsp
+        return "userManage";
+    }
+
+    // 添加用户表单页面
+    @RequestMapping(value = "/addUser", method = RequestMethod.GET)
+    public String addUser(){
+        return "addUser";
+    }
+
+    // 添加用户处理
+    @RequestMapping(value = "/addUserPost", method = RequestMethod.POST)
+    public String addUserPost(@ModelAttribute("user") UserEntity userEntity){
+        // 向数据库添加一个用户
+        //userRepository.save(userEntity);
+
+        // 向数据库添加一个用户，并将内存中缓存区的数据刷新，立即写入数据库，之后才可以进行访问读取
+        userRepository.saveAndFlush(userEntity);
+
+        // 返回重定向页面
+        return "redirect:/users";
+    }
+
+    // 查看用户详细信息
+    // @PathVariable可以收集url中的变量，需匹配的变量用{}括起来
+    // 例如：访问 localhost:8080/showUser/1 ，将匹配 userId = 1
+    @RequestMapping(value = "/showUser/{userId}", method = RequestMethod.GET)
+    public String showUser( @PathVariable("userId") Integer userId, ModelMap modelMap ){
+        UserEntity userEntity = userRepository.findOne(userId);
+        modelMap.addAttribute("user", userEntity);
+        return "userDetail";
+    }
+
+    // 更新用户信息页面
+    @RequestMapping(value = "/updateUser/{userId}", method = RequestMethod.GET)
+    public String updateUser(@PathVariable("userId") Integer userId, ModelMap modelMap){
+        UserEntity userEntity = userRepository.findOne(userId);
+        modelMap.addAttribute("user", userEntity);
+        return "updateUser";
+    }
+    // 处理用户修改请求
+    @RequestMapping(value = "/updateUserPost", method = RequestMethod.POST)
+    public String updateUserPost(@ModelAttribute("user") UserEntity userEntity){
+        userRepository.updateUser(
+                userEntity.getFirstName(),
+                userEntity.getLastName(),
+                userEntity.getPassword(),
+                userEntity.getId()
+        );
+        return "redirect:/users";
+    }
+
+    // 删除用户
+    @RequestMapping(value = "/deleteUser/{userId}", method = RequestMethod.GET)
+    public String deleteUser(@PathVariable("userId") Integer userId){
+        // 删除id为userId的用户
+        userRepository.delete(userId);
+        // 立即刷新数据库
+        userRepository.flush();
+        return "redirect:/users";
+    }
+}
+BlogEntity.java
+package com.cenyol.example.model;
+
+import javax.persistence.*;
+
+/**
+ * Created by sjj on 2015/10/24 0024.
+ */
+@Entity
+@Table(name = "blog", schema = "", catalog = "test")
+public class BlogEntity {
+    private int id;
+    private String title;
+    private String content;
+    private UserEntity userByUserid;
+
+    @Id
+    @Column(name = "id", nullable = false, insertable = true, updatable = true)
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    @Basic
+    @Column(name = "title", nullable = true, insertable = true, updatable = true, length = 100)
+    public String getTitle() {
+        return title;
+    }
+
+    public void setTitle(String title) {
+        this.title = title;
+    }
+
+    @Basic
+    @Column(name = "content", nullable = true, insertable = true, updatable = true, length = 255)
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        BlogEntity that = (BlogEntity) o;
+
+        if (id != that.id) return false;
+        if (title != null ? !title.equals(that.title) : that.title != null) return false;
+        if (content != null ? !content.equals(that.content) : that.content != null) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id;
+        result = 31 * result + (title != null ? title.hashCode() : 0);
+        result = 31 * result + (content != null ? content.hashCode() : 0);
+        return result;
+    }
+
+    @ManyToOne
+    @JoinColumn(name = "userid", referencedColumnName = "id")
+    public UserEntity getUserByUserid() {
+        return userByUserid;
+    }
+
+    public void setUserByUserid(UserEntity userByUserid) {
+        this.userByUserid = userByUserid;
+    }
+}
+
+UserEntity.java
+
+package com.cenyol.example.model;
+
+import javax.persistence.*;
+import java.util.Collection;
+
+/**
+ * Created by sjj on 2015/10/24 0024.
+ */
+@Entity
+@Table(name = "user", schema = "", catalog = "test")
+public class UserEntity {
+    private int id;
+    private String firstName;
+    private String lastName;
+    private String password;
+    private Collection<BlogEntity> blogsById;
+
+    @Id
+    @Column(name = "id", nullable = false, insertable = true, updatable = true)
+    public int getId() {
+        return id;
+    }
+
+    public void setId(int id) {
+        this.id = id;
+    }
+
+    @Basic
+    @Column(name = "firstName", nullable = true, insertable = true, updatable = true, length = 45)
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    @Basic
+    @Column(name = "lastName", nullable = true, insertable = true, updatable = true, length = 45)
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    @Basic
+    @Column(name = "password", nullable = true, insertable = true, updatable = true, length = 45)
+    public String getPassword() {
+        return password;
+    }
+
+    public void setPassword(String password) {
+        this.password = password;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (o == null || getClass() != o.getClass()) return false;
+
+        UserEntity that = (UserEntity) o;
+
+        if (id != that.id) return false;
+        if (firstName != null ? !firstName.equals(that.firstName) : that.firstName != null) return false;
+        if (lastName != null ? !lastName.equals(that.lastName) : that.lastName != null) return false;
+        if (password != null ? !password.equals(that.password) : that.password != null) return false;
+
+        return true;
+    }
+
+    @Override
+    public int hashCode() {
+        int result = id;
+        result = 31 * result + (firstName != null ? firstName.hashCode() : 0);
+        result = 31 * result + (lastName != null ? lastName.hashCode() : 0);
+        result = 31 * result + (password != null ? password.hashCode() : 0);
+        return result;
+    }
+
+    @OneToMany(mappedBy = "userByUserid")
+    public Collection<BlogEntity> getBlogsById() {
+        return blogsById;
+    }
+
+    public void setBlogsById(Collection<BlogEntity> blogsById) {
+        this.blogsById = blogsById;
+    }
+}
+
+UserRepository.java
+
+package com.cenyol.example.repository;
+
+import com.cenyol.example.model.UserEntity;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
+
+/**
+ * Created by sjj on 2015/10/24 0024.
+ */
+@Repository // 添加注解
+public interface UserRepository extends JpaRepository<UserEntity, Integer> {
+    @Modifying // 说明该方法是修改操作
+    @Transactional // 说明该方法是事务性操作
+    // 定义查询
+    // @Param注解用于提取参数
+    @Query("update UserEntity us set us.firstName=:qFirstName, us.lastName=:qLastName, us.password=:qPassword where us.id=:qId")
+    public void updateUser(@Param("qFirstName") String firstName,
+                           @Param("qLastName") String qLastName,
+                           @Param("qPassword") String password,
+                           @Param("qId") Integer id);
